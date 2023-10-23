@@ -10,7 +10,7 @@ This project is designed to solve a drone delivery optimization problem, where e
 
 ## Project Structure
 
-- **Domain**: Contains all the domain entities.
+- **Domain**: Contains all the domain entities (Drone and Location).
 - **Application (UseCases)**: Handles the business logic and use cases.
 - **Presentation**: Holds the front-end and API logic.
 
@@ -26,7 +26,7 @@ You can toggle between these strategies when hitting the endpoint.
 
 1. Restore all NuGet packages.
 2. Build the project.
-3. Run the API, then run the front-end Blazor app.
+3. Run the .Server project.
 4. Execute unit tests to verify everything is working as expected.
 
 ## Testing
