@@ -1,0 +1,176 @@
+﻿@page "/"
+@using System.Net.Http.Headers;
+@using DroneCodingTest.Client.Helpers;
+@using DroneCodingTest.Shared.Dtos;
+@using DroneCodingTest.Shared.Requests;
+@using DroneCodingTest.Shared.Results;
+@using System.Text;
+@using Humanizer;
+@using System.Text.Json;
+@inject HttpClient HttpClient
+@inject NotificationService NotificationService
+
+<PageTitle>Drone Delivery Service</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-4">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Subtitle2" TagName="TagName.H3">Upload input file</RadzenText>
+                <RadzenFileInput @bind-Value=@_fileContent @bind-FileName=@_fileName @bind-FileSize=@_fileSize
+                                 TValue="byte[]" class="w-100" Accept="text/plain" />
+                <RadzenButton Text="Upload" Click=@UploadFile class="d-block mt-4" />
+            </RadzenCard>
+        </div>
+        <div class="col-md-8">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.Subtitle2" TagName="TagName.H3">Choose travel rule</RadzenText>
+                <RadzenDropDown @bind-Value="@_selectedTravelRule" Data="@_travelRules"
+                                Style="width:100%;" TextProperty="Text" ValueProperty="Value" />
+                <RadzenText class="mt-4">@_travelRules.First(x => x.Value == _selectedTravelRule).Description</RadzenText>
+            </RadzenCard>
+        </div>
+    </div>
+
+    @if (droneDeliveryResult != null)
+    {
+        <div class="row">
+            <div class="col">
+                <RadzenCard class="my-3">
+                    <div class="d-flex align-items-center">
+                        <RadzenText TextStyle="TextStyle.Subtitle2" TagName="TagName.H3" class="mb-0">Drone Trips</RadzenText>
+                        <RadzenButton Icon="cached" Click=@ToggleView class="mx-2"/>
+                    </div>
+
+                    @if (showTreeView)
+                    {
+                        <RadzenTree Style="width: 100%; height: 600px">
+                            @foreach (var droneTrip in droneDeliveryResult.DroneTrips.OrderBy(x => x.Drone.Name))
+                            {
+                                <RadzenTreeItem Text="@droneTrip.Drone!.Name" Expanded="true">
+                                    <ChildContent>
+                                        @foreach (var trip in droneTrip.Trips)
+                                        {
+                                            var tripText = $"{trip.Name} - Total Weight {trip.TotalWeight}";
+                                            var locations = string.Join(", ", trip.Locations.Select(x => x.Name));
+                                            <RadzenTreeItem Text="@tripText" Expanded="true">
+                                                <ChildContent>
+                                                    <RadzenTreeItem Text="@locations" />
+                                                </ChildContent>
+                                            </RadzenTreeItem>
+                                        }
+                                        @for (var i = 0; i < droneTrip.Trips.Count; i++)
+                                        {
+
+                                        }
+                                    </ChildContent>
+                                    <Template>
+                                        <b>@context.Text</b>
+                                    </Template>
+                                </RadzenTreeItem>
+                            }
+                        </RadzenTree>
+                    }
+                    else
+                    {
+                        <div class="my-3">
+                            @foreach (var droneTrip in droneDeliveryResult.DroneTrips.OrderBy(x => x.Drone.Name))
+                            {
+                                <span>@droneTrip.Drone!.Name</span>
+                                <br />
+                                foreach (var trip in droneTrip.Trips)
+                                {
+                                    <span>&nbsp&nbsp @trip.Name</span>
+                                    <br />
+                                    <span>&nbsp&nbsp&nbsp&nbsp @string.Join(", ", trip.Locations.Select(x => x.Name))</span>
+                                    <br />
+                                }
+                            }
+                        </div>
+                    }
+                </RadzenCard>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private byte[]? _fileContent;
+    private string _fileName = string.Empty;
+    private long? _fileSize;
+    private DroneDeliveryResult? droneDeliveryResult;
+    private bool showTreeView = true;
+
+    private List<DropDownItem> _travelRules = new List<DropDownItem>();
+    private int _selectedTravelRule = 1;
+    private string travelRuleDescription = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _travelRules.Add(new DropDownItem(
+            TravelRules.NoTravelTime.ToString().Humanize(),
+            (int)TravelRules.NoTravelTime,
+            "Here we adhere to the challenge's specifications where neither travel time nor refueling costs are considered. " +
+            "Given these conditions, the most logical approach is to use the drone capable of carrying the highest payload. " +
+            "By doing so, we can deliver the most weight in a single trip, thereby reducing the overall number of trips needed. " +
+            "The rationale behind this is simple: a drone with higher payload capacity will minimize the need for additional trips."));
+
+        _travelRules.Add(new DropDownItem(
+        TravelRules.HasTravelTime.ToString().Humanize(),
+        (int)TravelRules.HasTravelTime,
+        "This is a more realistic strategy: each drone takes a fixed amount of time to complete a delivery trip. " +
+        "Unlike the \"No Travel Time\" model, this strategy takes into consideration that while one drone might be " +
+        "capable of carrying a larger payload, the time it takes for a round trip remains constant for all drones. " +
+        "By factoring in travel time, the strategy encourages the use of multiple drones to deliver packages concurrently. " + 
+        "In essence, it distributes the workload across the drone fleet, aiming to make the delivery process more efficient " + 
+        "in a time-sensitive context. Here, you might find that the best solution isn't always to use the drone with the highest " + 
+        "carrying capacity but to utilize a combination of drones to get packages delivered in parallel. " +
+        "This strategy aligns more closely with real-world scenarios where time is of the essence."));
+    }
+
+    private async Task UploadFile()
+    {
+        if (_fileContent != null && _fileContent.Length > 0)
+        {
+            var formData = new MultipartFormDataContent();
+            var byteContent = new ByteArrayContent(_fileContent);
+
+            byteContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            formData.Add(byteContent, "InputFile", _fileName);
+
+            var travelRules = new StringContent(JsonSerializer.Serialize(_selectedTravelRule), Encoding.UTF8, "application/json");
+            formData.Add(travelRules, "TravelRules");
+
+            var response = await HttpClient.PostAsync("DroneDeliveries/OptimalDeliveries", formData);
+
+            if (response.IsSuccessStatusCode)
+            {
+                droneDeliveryResult = await response.Content.ReadFromJsonAsync<DroneDeliveryResult>();
+            }
+            else
+            {
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    var validationErrors = await response.Content.ReadFromJsonAsync<List<string>>();
+
+                    if (validationErrors != null)
+                    {
+                        foreach (var validationError in validationErrors)
+                        {
+                            NotificationService.Notify(NotificationSeverity.Error, validationError, duration: 5000);
+                        }
+                    }
+                }
+                else
+                {
+                    // NotificationService.Notify();
+                }
+            }
+        }
+    }
+
+    private void ToggleView()
+    {
+        showTreeView = !showTreeView;
+    }
+}
