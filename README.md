@@ -1,6 +1,12 @@
-# Project Overview
+﻿# Project Overview
 
 This project is designed to solve a drone delivery optimization problem, where each drone can carry a certain weight and deliver packages to multiple locations. The main aim is to minimize the number of trips required by each drone to complete all deliveries. This is essential, as each time a drone returns to the home base, refueling and reloading costs are incurred.
+
+## 🚀 Live Demo
+
+👉 [Try the application live](https://dronecodingtest.azurewebsites.net/)
+
+> This application is automatically deployed using GitHub Actions and is hosted on Azure.
 
 ## Tech Stack
 
